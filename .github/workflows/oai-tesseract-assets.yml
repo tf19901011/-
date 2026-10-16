@@ -1,0 +1,39 @@
+name: OAI Tesseract Assets
+on:
+  push:
+    branches:
+      - oai-offline-assets-v1
+  workflow_dispatch:
+
+jobs:
+  fetch-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install OCR packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work out
+          cd work
+          npm init -y >/dev/null 2>&1
+          npm install --ignore-scripts --no-audit --no-fund tesseract.js@5.1.1 tesseract.js-core@5.1.1
+          cp node_modules/tesseract.js/dist/tesseract.min.js ../out/tesseract.min.js
+          cp node_modules/tesseract.js/dist/worker.min.js ../out/worker.min.js
+          cp -a node_modules/tesseract.js-core ../out/tesseract.js-core
+          cd ../out
+          curl -L --fail --retry 3 -o eng.traineddata.gz https://github.com/naptha/tessdata/raw/gh-pages/4.0.0_fast/eng.traineddata.gz
+          curl -L --fail --retry 3 -o kor.traineddata.gz https://github.com/naptha/tessdata/raw/gh-pages/4.0.0_fast/kor.traineddata.gz
+          find . -maxdepth 3 -type f -printf '%P\n' | sort > FILES.txt
+          sha256sum $(find . -type f ! -name SHA256SUMS.txt | sort) > SHA256SUMS.txt
+      - name: Upload OCR assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-pdf-editor-v11-ocr-assets
+          path: out/
+          if-no-files-found: error
+          retention-days: 1
